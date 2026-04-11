@@ -18,6 +18,10 @@ services:
     container_name: user-service
     ports:
       - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices_db
+    depends_on:
+      - postgres
 
   product-service:
     build: ../services/product-service
