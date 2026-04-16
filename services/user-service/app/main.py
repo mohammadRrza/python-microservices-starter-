@@ -42,4 +42,4 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/")
 def root():
-    return {"message": "Gateway is running"}
+    return {"message": "User service is running"}
