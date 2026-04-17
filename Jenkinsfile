@@ -4,17 +4,32 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "mrtbadboy"
         DOCKERHUB_CREDENTIALS = "dockerhub-credentials"
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
 
         stage('Build Images') {
             steps {
                 script {
-                    docker.build("${DOCKERHUB_USERNAME}/user-service:latest", "./services/user-service")
-                    docker.build("${DOCKERHUB_USERNAME}/product-service:latest", "./services/product-service")
-                    docker.build("${DOCKERHUB_USERNAME}/order-service:latest", "./services/order-service")
-                    docker.build("${DOCKERHUB_USERNAME}/gateway-service:latest", "./services/gateway-service")
+                    def services = [
+                        'user-service',
+                        'product-service',
+                        'order-service',
+                        'gateway-service'
+                    ]
+
+                    for (service in services) {
+                        docker.build(
+                            "${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}",
+                            "./services/${service}"
+                        )
+                    }
                 }
             }
         }
@@ -22,11 +37,18 @@ pipeline {
         stage('Push Images') {
             steps {
                 script {
+                    def services = [
+                        'user-service',
+                        'product-service',
+                        'order-service',
+                        'gateway-service'
+                    ]
+
                     docker.withRegistry('', DOCKERHUB_CREDENTIALS) {
-                        docker.image("${DOCKERHUB_USERNAME}/user-service:latest").push()
-                        docker.image("${DOCKERHUB_USERNAME}/product-service:latest").push()
-                        docker.image("${DOCKERHUB_USERNAME}/order-service:latest").push()
-                        docker.image("${DOCKERHUB_USERNAME}/gateway-service:latest").push()
+                        for (service in services) {
+                            docker.image("${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}").push()
+                            docker.image("${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}").push('latest')
+                        }
                     }
                 }
             }
