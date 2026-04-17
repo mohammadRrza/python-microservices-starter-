@@ -1,6 +1,18 @@
 pipeline {
     agent any
+    parameters {
+        choice(
+            name: 'ENV',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Deployment environment'
+        )
 
+        booleanParam(
+            name: 'DEPLOY',
+            defaultValue: false,
+            description: 'Deploy after build?'
+        )
+    }
     environment {
         DOCKERHUB_USERNAME = "mrtbadboy"
         DOCKERHUB_CREDENTIALS = "dockerhub-credentials"
@@ -49,6 +61,21 @@ pipeline {
                             docker.image("${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}").push()
                             docker.image("${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}").push('latest')
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                expression { params.DEPLOY }
+            }
+            steps {
+                script {
+                    if (params.ENV == 'prod') {
+                        echo "Deploying to PRODUCTION 🚨"
+                    } else {
+                        echo "Deploying to ${params.ENV}"
                     }
                 }
             }
