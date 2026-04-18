@@ -1,5 +1,6 @@
 pipeline {
     agent any
+
     parameters {
         choice(
             name: 'ENV',
@@ -13,6 +14,7 @@ pipeline {
             description: 'Deploy after build?'
         )
     }
+
     environment {
         DOCKERHUB_USERNAME = "mrtbadboy"
         DOCKERHUB_CREDENTIALS = "dockerhub-credentials"
@@ -66,38 +68,43 @@ pipeline {
             }
         }
 
-stage('Deploy') {
-    when {
-        expression { params.DEPLOY }
-    }
-    steps {
-        withCredentials([
-            sshUserPrivateKey(
-                credentialsId: 'server-ssh-key',
-                keyFileVariable: 'SSH_KEY',
-                usernameVariable: 'USER'
-            )
-        ]) {
-            sh '''
-                ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@161.35.28.3" '
-                    mkdir -p /opt/microservices/deploy
-                '
+        stage('Deploy') {
+            when {
+                expression { params.DEPLOY }
+            }
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'server-ssh-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'USER'
+                    )
+                ]) {
+                    withEnv([
+                        "DEPLOY_SERVER=161.35.28.3",
+                        "REMOTE_DIR=/opt/microservices/deploy",
+                        "DEPLOY_TAG=${IMAGE_TAG}"
+                    ]) {
+                        sh '''
+                            ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@$DEPLOY_SERVER" "mkdir -p $REMOTE_DIR"
 
-                scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-                    deploy/docker-compose.prod.yml \
-                    "$USER@161.35.28.3:/opt/microservices/deploy/docker-compose.yml"
+                            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
+                                deploy/docker-compose.prod.yml \
+                                "$USER@$DEPLOY_SERVER:$REMOTE_DIR/docker-compose.yml"
 
-                ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@161.35.28.3" "
-                    cd /opt/microservices/deploy
-                    echo IMAGE_TAG=${params.IMAGE_TAG} > .env
-                    docker-compose pull
-                    docker-compose up -d
-                "
-            '''
+                            ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@$DEPLOY_SERVER" "
+                                cd $REMOTE_DIR
+                                echo IMAGE_TAG=$DEPLOY_TAG > .env
+                                docker-compose pull
+                                docker-compose up -d
+                            "
+                        '''
+                    }
+                }
+            }
         }
     }
-}
-    }
+
     post {
         always {
             cleanWs()
