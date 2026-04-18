@@ -68,26 +68,21 @@ pipeline {
 
 stage('Test SSH') {
     steps {
-        script {
-            withCredentials([
-                sshUserPrivateKey(
-                    credentialsId: 'server-ssh-key',
-                    keyFileVariable: 'SSH_KEY',
-                    usernameVariable: 'USER'
-                )
-            ]) {
-
-                sh """
-                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $USER@161.35.28.3"
-                    echo 'connected successfully'
+        withCredentials([
+            sshUserPrivateKey(
+                credentialsId: 'server-ssh-key',
+                keyFileVariable: 'SSH_KEY',
+                usernameVariable: 'USER'
+            )
+        ]) {
+            sh '''
+                ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@161.35.28.3" '
+                    echo connected successfully
                     hostname
                     docker ps
-                "
-                """
-
-            }
+                '
+            '''
         }
-    }
     }
 }
 }
