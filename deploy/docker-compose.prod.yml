@@ -1,0 +1,55 @@
+services:
+  gateway-service:
+    image: mrtbadboy/gateway-service:${IMAGE_TAG}
+    ports:
+      - "8000:8000"
+    environment:
+      USER_SERVICE_URL: http://user-service:8001
+      PRODUCT_SERVICE_URL: http://product-service:8002
+      ORDER_SERVICE_URL: http://order-service:8003
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    restart: unless-stopped
+
+  user-service:
+    image: mrtbadboy/user-service:${IMAGE_TAG}
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices_db
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  product-service:
+    image: mrtbadboy/product-service:${IMAGE_TAG}
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+
+  order-service:
+    image: mrtbadboy/order-service:${IMAGE_TAG}
+    ports:
+      - "8003:8003"
+    environment:
+      USER_SERVICE_URL: http://user-service:8001
+      PRODUCT_SERVICE_URL: http://product-service:8002
+    depends_on:
+      - user-service
+      - product-service
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: microservices_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
