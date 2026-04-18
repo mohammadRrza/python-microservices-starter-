@@ -78,7 +78,7 @@ stage('Test SSH') {
             ]) {
 
                 sh """
-                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $USER@YOUR_SERVER_IP "
+                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $USER@161.35.28.3"
                     echo 'connected successfully'
                     hostname
                     docker ps
