@@ -82,7 +82,8 @@ stage('Test SSH') {
                     docker ps
                 '
             '''
+                }
+            }
         }
-    }
-}
+    }      
 }
