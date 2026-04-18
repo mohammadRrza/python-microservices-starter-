@@ -66,7 +66,10 @@ pipeline {
             }
         }
 
-stage('Test SSH') {
+stage('Deploy') {
+    when {
+        expression { params.DEPLOY }
+    }
     steps {
         withCredentials([
             sshUserPrivateKey(
@@ -77,13 +80,27 @@ stage('Test SSH') {
         ]) {
             sh '''
                 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@161.35.28.3" '
-                    echo connected successfully
-                    hostname
-                    docker ps
+                    mkdir -p /opt/microservices/deploy
                 '
+
+                scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
+                    deploy/docker-compose.prod.yml \
+                    "$USER@161.35.28.3:/opt/microservices/deploy/docker-compose.yml"
+
+                ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@161.35.28.3" "
+                    cd /opt/microservices/deploy
+                    echo IMAGE_TAG=${params.IMAGE_TAG} > .env
+                    docker-compose pull
+                    docker-compose up -d
+                "
             '''
-                }
-            }
         }
-    }      
+    }
+}
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
 }
