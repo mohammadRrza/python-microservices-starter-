@@ -84,7 +84,7 @@ stage('Deploy') {
                 '
 
                 scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-                    deploy/docker-compose.prod.yml \
+                    /opt/microservices/deploy/docker-compose.prod.yml \
                     "$USER@161.35.28.3:/opt/microservices/deploy/docker-compose.yml"
 
                 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@161.35.28.3" "
