@@ -7,7 +7,6 @@ pipeline {
             choices: ['dev', 'staging', 'prod'],
             description: 'Deployment environment'
         )
-
         booleanParam(
             name: 'DEPLOY',
             defaultValue: false,
@@ -25,6 +24,13 @@ pipeline {
         stage('Checkout SCM') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Branch Info') {
+            steps {
+                echo "Branch: ${env.BRANCH_NAME}"
+                echo "Image tag: ${env.IMAGE_TAG}"
             }
         }
 
@@ -48,7 +54,35 @@ pipeline {
             }
         }
 
+        stage('Test') {
+            when {
+                expression {
+                    env.BRANCH_NAME?.startsWith('feature/') || env.BRANCH_NAME == 'main'
+                }
+            }
+            steps {
+                echo "Running tests for ${env.BRANCH_NAME}"
+                script {
+                    def services = [
+                        'user-service',
+                        'product-service',
+                        'order-service',
+                        'gateway-service'
+                    ]
+
+                    for (service in services) {
+                        sh "docker run --rm ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG} pytest -v"
+                    }
+                }
+            }
+        }
+
         stage('Push Images') {
+            when {
+                expression {
+                    env.BRANCH_NAME?.startsWith('bugfix/') || env.BRANCH_NAME == 'main'
+                }
+            }
             steps {
                 script {
                     def services = [
@@ -70,7 +104,10 @@ pipeline {
 
         stage('Deploy') {
             when {
-                expression { params.DEPLOY }
+                allOf {
+                    branch 'main'
+                    expression { params.DEPLOY }
+                }
             }
             steps {
                 withCredentials([
@@ -82,7 +119,7 @@ pipeline {
                 ]) {
                     withEnv([
                         "DEPLOY_SERVER=161.35.28.3",
-                        "REMOTE_DIR=/opt/microservices/deploy",
+                        "REMOTE_DIR=/opt/microservices/${params.ENV}",
                         "DEPLOY_TAG=${IMAGE_TAG}"
                     ]) {
                         sh '''
@@ -106,6 +143,12 @@ pipeline {
     }
 
     post {
+        success {
+            echo "Pipeline succeeded on ${env.BRANCH_NAME}"
+        }
+        failure {
+            echo "Pipeline failed on ${env.BRANCH_NAME}"
+        }
         always {
             cleanWs()
         }
