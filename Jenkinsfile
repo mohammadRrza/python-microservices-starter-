@@ -95,8 +95,8 @@ pipeline {
                             ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@$DEPLOY_SERVER" "
                                 cd $REMOTE_DIR
                                 echo IMAGE_TAG=$DEPLOY_TAG > .env
-                                docker-compose pull
-                                docker-compose up -d
+                                docker compose pull
+                                docker compose up -d
                             "
                         '''
                     }
