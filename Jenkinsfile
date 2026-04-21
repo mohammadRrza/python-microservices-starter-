@@ -1,3 +1,8 @@
+@Library('my-shared-lib') _
+
+import com.helper.DockerHelper
+import com.helper.DeployHelper
+
 pipeline {
     agent any
 
@@ -7,6 +12,7 @@ pipeline {
             choices: ['dev', 'staging', 'prod'],
             description: 'Deployment environment'
         )
+
         booleanParam(
             name: 'DEPLOY',
             defaultValue: false,
@@ -21,7 +27,8 @@ pipeline {
     }
 
     stages {
-        stage('Checkout SCM') {
+
+        stage('Checkout') {
             steps {
                 checkout scm
             }
@@ -44,12 +51,13 @@ pipeline {
                         'gateway-service'
                     ]
 
-                    for (service in services) {
-                        docker.build(
-                            "${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}",
-                            "./services/${service}"
-                        )
-                    }
+                    def dockerHelper = new DockerHelper(this)
+
+                    dockerHelper.buildImages(
+                        services,
+                        env.DOCKERHUB_USERNAME,
+                        env.IMAGE_TAG
+                    )
                 }
             }
         }
@@ -62,18 +70,7 @@ pipeline {
             }
             steps {
                 echo "Running tests for ${env.BRANCH_NAME}"
-                script {
-                    def services = [
-                        'user-service',
-                        'product-service',
-                        'order-service',
-                        'gateway-service'
-                    ]
 
-                    for (service in services) {
-                        sh "docker run --rm ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG} pytest -v"
-                    }
-                }
             }
         }
 
@@ -92,12 +89,14 @@ pipeline {
                         'gateway-service'
                     ]
 
-                    docker.withRegistry('', DOCKERHUB_CREDENTIALS) {
-                        for (service in services) {
-                            docker.image("${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}").push()
-                            docker.image("${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}").push('latest')
-                        }
-                    }
+                    def dockerHelper = new DockerHelper(this)
+
+                    dockerHelper.pushImages(
+                        services,
+                        env.DOCKERHUB_USERNAME,
+                        env.IMAGE_TAG,
+                        env.DOCKERHUB_CREDENTIALS
+                    )
                 }
             }
         }
@@ -110,33 +109,16 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([
-                    sshUserPrivateKey(
+                script {
+                    def deployHelper = new DeployHelper(this)
+
+                    deployHelper.deployWithCompose(
                         credentialsId: 'server-ssh-key',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'USER'
+                        server: '161.35.28.3',
+                        remoteDir: "/opt/microservices/${params.ENV}",
+                        imageTag: env.IMAGE_TAG,
+                        composeFile: 'deploy/docker-compose.prod.yml'
                     )
-                ]) {
-                    withEnv([
-                        "DEPLOY_SERVER=161.35.28.3",
-                        "REMOTE_DIR=/opt/microservices/${params.ENV}",
-                        "DEPLOY_TAG=${IMAGE_TAG}"
-                    ]) {
-                        sh '''
-                            ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@$DEPLOY_SERVER" "mkdir -p $REMOTE_DIR"
-
-                            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-                                deploy/docker-compose.prod.yml \
-                                "$USER@$DEPLOY_SERVER:$REMOTE_DIR/docker-compose.yml"
-
-                            ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$USER@$DEPLOY_SERVER" "
-                                cd $REMOTE_DIR
-                                echo IMAGE_TAG=$DEPLOY_TAG > .env
-                                docker compose pull
-                                docker compose up -d
-                            "
-                        '''
-                    }
                 }
             }
         }
@@ -144,10 +126,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline succeeded on ${env.BRANCH_NAME}"
+            echo "✅ Pipeline succeeded on ${env.BRANCH_NAME}"
         }
         failure {
-            echo "Pipeline failed on ${env.BRANCH_NAME}"
+            echo "❌ Pipeline failed on ${env.BRANCH_NAME}"
         }
         always {
             cleanWs()
