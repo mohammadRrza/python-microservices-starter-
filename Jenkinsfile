@@ -37,7 +37,7 @@ pipeline {
         stage('Branch Info') {
             steps {
                 echo "Branch: ${env.BRANCH_NAME}"
-                echo "Webhook Test for github webhook"
+                echo "Webhook Test for github webhook integration"
                 echo "Image tag: ${env.IMAGE_TAG}"
             }
         }
