@@ -37,6 +37,7 @@ pipeline {
         stage('Branch Info') {
             steps {
                 echo "Branch: ${env.BRANCH_NAME}"
+                echo "Webhook Test"
                 echo "Image tag: ${env.IMAGE_TAG}"
             }
         }
@@ -125,14 +126,14 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ Pipeline succeeded on ${env.BRANCH_NAME}"
-        }
-        failure {
-            echo "❌ Pipeline failed on ${env.BRANCH_NAME}"
-        }
         always {
-            cleanWs()
+            script {
+                try {
+                    cleanWs()
+                } catch (err) {
+                    echo "cleanWs skipped: ${err.message}"
+                }
+            }
         }
     }
 }
