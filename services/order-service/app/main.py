@@ -1,8 +1,10 @@
+import datetime
 import os
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
+from kafka.producer import start_kafka_producer, stop_kafka_producer, publish_event
 
 app = FastAPI(title="Order Service")
 
@@ -24,6 +26,15 @@ fake_orders = [
     {"id": 1, "user_id": 1, "product_id": 2, "quantity": 3},
     {"id": 2, "user_id": 2, "product_id": 1, "quantity": 1},
 ]
+
+@app.on_event("startup")
+async def startup():
+    await start_kafka_producer()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await stop_kafka_producer()
 
 
 @app.get("/")
@@ -70,4 +81,13 @@ async def create_order(order: OrderCreate):
         "quantity": order.quantity,
     }
     fake_orders.append(new_order)
+    await publish_event(
+        topic="orders.events",
+        event={
+            "event_type": "OrderCreated",
+            "event_version": 1,
+            "occurred_at": datetime.utcnow().isoformat(),
+            "data": new_order,
+        },
+    )
     return new_order
