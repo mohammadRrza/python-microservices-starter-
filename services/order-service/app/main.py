@@ -4,7 +4,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
-from kafka.producer import start_kafka_producer, stop_kafka_producer, publish_event
+from messaging.producer import start_kafka_producer, stop_kafka_producer, publish_event
 
 app = FastAPI(title="Order Service")
 
@@ -86,7 +86,7 @@ async def create_order(order: OrderCreate):
         event={
             "event_type": "OrderCreated",
             "event_version": 1,
-            "occurred_at": datetime.utcnow().isoformat(),
+            "occurred_at": datetime.datetime.now().isoformat(),
             "data": new_order,
         },
     )

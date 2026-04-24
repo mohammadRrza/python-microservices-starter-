@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+aiokafka==0.10.0
+kafka-python==2.0.2

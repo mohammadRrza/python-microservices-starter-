@@ -1,0 +1,26 @@
+_format_version: "3.0"
+
+services:
+  - name: user-service
+    url: http://user-service:8001
+    routes:
+      - name: user-routes
+        paths:
+          - /users
+        strip_path: false
+
+  - name: product-service
+    url: http://product-service:8002
+    routes:
+      - name: product-routes
+        paths:
+          - /products
+        strip_path: false
+
+  - name: order-service
+    url: http://order-service:8003
+    routes:
+      - name: order-routes
+        paths:
+          - /orders
+        strip_path: false
