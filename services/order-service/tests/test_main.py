@@ -20,13 +20,13 @@ def test_get_orders():
     assert data[0]["user_id"] == 1
 
 
-# def test_get_order_found():
-#     response = client.get("/orders/1")
-#     assert response.status_code == 200
-#     assert response.json()["id"] == 1
+def test_get_order_found():
+     response = client.get("/orders/1")
+     assert response.status_code == 200
+     assert response.json()["id"] == 1
 
 
 def test_get_order_not_found():
     response = client.get("/orders/999")
     assert response.status_code != 200
-    assert response.json() == {"message": "Order not found"}
+    assert response.json() == {"detail": "Order not found"}

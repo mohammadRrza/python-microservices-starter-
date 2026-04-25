@@ -28,5 +28,5 @@ def test_get_product_found():
 
 def test_get_product_not_found():
     response = client.get("/products/999")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Product not found"}
+    assert response.status_code != 200
+    assert response.json() == {"detail": "Product not found"}

@@ -1,3 +1,7 @@
+import os
+
+os.environ["DATABASE_URL"] = "sqlite:///./tests/test.db"
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
@@ -5,17 +9,18 @@ from fastapi.testclient import TestClient
 from app.db import Base, get_db
 from app.main import app
 
-
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+SQLALCHEMY_DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
 )
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base.metadata.drop_all(bind=engine)
-Base.metadata.create_all(bind=engine)
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
 
 
 def override_get_db():
@@ -26,14 +31,24 @@ def override_get_db():
         db.close()
 
 
+Base.metadata.create_all(bind=engine)
 app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
 
 
+def test_openapi_schema():
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+
+
 def setup_function():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+
+
+def teardown_function():
+    Base.metadata.drop_all(bind=engine)
 
 
 def test_health():
