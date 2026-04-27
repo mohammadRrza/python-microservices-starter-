@@ -1,16 +1,32 @@
 import datetime
 import os
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
 from messaging.producer import start_kafka_producer, stop_kafka_producer, publish_event
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.security import verify_token
+from sqlalchemy.orm import Session
+from app.db import Base, engine, get_db
+
+security = HTTPBearer()
 
 app = FastAPI(title="Order Service")
 
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user-service:8001")
 PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://product-service:8002")
 
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+    payload = verify_token(token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return payload
 
 class OrderCreate(BaseModel):
     user_id: int
@@ -61,7 +77,11 @@ def get_order(order_id: int):
 
 
 @app.post("/orders", response_model=OrderResponse, status_code=201)
-async def create_order(order: OrderCreate):
+async def create_order(
+    order: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    ):
     if order.quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
 
