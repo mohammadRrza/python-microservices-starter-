@@ -1,23 +1,13 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from typing import List
 
+from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.db import get_db
+from app.models import Product
+from app.schemas import ProductCreate, ProductResponse
+
 app = FastAPI(title="Product Service")
-
-
-class ProductCreate(BaseModel):
-    name: str
-    price: float
-
-
-class ProductResponse(ProductCreate):
-    id: int
-
-
-fake_products = [
-    {"id": 1, "name": "Laptop", "price": 1200.0},
-    {"id": 2, "name": "Mouse", "price": 25.0},
-]
 
 
 @app.get("/")
@@ -31,24 +21,22 @@ def health():
 
 
 @app.get("/products", response_model=List[ProductResponse])
-def get_products():
-    return fake_products
+def get_products(db: Session = Depends(get_db)):
+    return db.query(Product).order_by(Product.id).all()
 
 
 @app.get("/products/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int):
-    for product in fake_products:
-        if product["id"] == product_id:
-            return product
-    raise HTTPException(status_code=404, detail="Product not found")
+def get_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
 
 
-@app.post("/products", response_model=ProductResponse, status_code=201)
-def create_product(product: ProductCreate):
-    new_product = {
-        "id": len(fake_products) + 1,
-        "name": product.name,
-        "price": product.price,
-    }
-    fake_products.append(new_product)
-    return new_product
+@app.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+    db_product = Product(**product.model_dump())
+    db.add(db_product)
+    db.commit()
+    db.refresh(db_product)
+    return db_product
