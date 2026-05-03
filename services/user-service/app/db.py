@@ -1,11 +1,9 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from app.core.config import settings
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://admin:password@postgres:5432/microservices_db"
-)
+DATABASE_URL = settings.database_url
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

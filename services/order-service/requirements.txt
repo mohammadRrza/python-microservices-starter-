@@ -9,3 +9,4 @@ python-jose[cryptography]
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
 alembic==1.7.7
+pydantic-settings==2.5.2

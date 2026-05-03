@@ -2,10 +2,10 @@ import json
 import os
 import asyncio
 from aiokafka import AIOKafkaConsumer
-
+from app.core.config import settings
 
 async def consume_order_events():
-    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    bootstrap_servers = settings.kafka_bootstrap_servers
 
     while True:
         consumer = None
@@ -17,7 +17,7 @@ async def consume_order_events():
                 group_id="notification-service",
                 value_deserializer=lambda value: json.loads(value.decode("utf-8")),
                 auto_offset_reset="earliest",
-                enable_auto_commit=True,
+                enable_auto_commit=False,
             )
 
             await consumer.start()
@@ -28,7 +28,7 @@ async def consume_order_events():
 
                 if event.get("event_type") == "OrderCreated":
                     await handle_order_created(event)
-
+                await consumer.commit()
         except Exception as exc:
             print(f"Kafka consumer error, retrying in 5s... error={exc}")
             await asyncio.sleep(5)
@@ -42,7 +42,7 @@ async def consume_order_events():
 
 
 async def handle_order_created(event: dict):
-    data = event.get("data", {})
+    data = event.get("payload", {})
 
     print(
         f"Notification: order created. "
