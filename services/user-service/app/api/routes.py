@@ -1,85 +1,61 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Path
 from sqlalchemy.orm import Session
 
-from app.db import Base, engine, get_db
-from app.models import User
-from app.schemas import UserResponse, UserRegister, UserLogin, TokenResponse
-from app.security import hash_password, verify_password, create_access_token, verify_token
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-security = HTTPBearer()
+from app.db import get_db
+from app.repositories.user_repository import UserRepository
+from app.schemas import TokenResponse, UserLogin, UserRegister, UserResponse
+from app.security import get_current_user
+from app.services.user_service import UserService
 
 router = APIRouter()
+
+
+def get_user_service(db: Session = Depends(get_db)) -> UserService:
+    return UserService(UserRepository(db))
 
 
 @router.get("/health")
 def health():
     return {"status": "ok", "service": "user-service"}
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    token = credentials.credentials
-    payload = verify_token(token)
-
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    return payload
 
 @router.get("/users", response_model=list[UserResponse])
-def get_users(db: Session = Depends(get_db),
-               current_user=Depends(get_current_user),
-    ):
-    return db.query(User).all()
+def get_users(
+    service: UserService = Depends(get_user_service),
+    current_user=Depends(get_current_user),
+):
+    return service.list_users()
 
-@router.post("/register", response_model=UserResponse)
-def register(user: UserRegister, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already exists")
 
-    new_user = User(
-        name=user.name,
-        email=user.email,
-        hashed_password=hash_password(user.password),
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return new_user
+@router.post("/register", response_model=UserResponse, status_code=201)
+def register(
+    user: UserRegister,
+    service: UserService = Depends(get_user_service),
+):
+    return service.register(user)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+def login(
+    user: UserLogin,
+    service: UserService = Depends(get_user_service),
+):
+    return service.login(user)
 
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    if not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = create_access_token(
-        data={
-            "sub": str(db_user.id),
-            "email": db_user.email,
-        }
-    )
-
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-    }
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def get_user(
+    user_id: int = Path(..., gt=0),
+    service: UserService = Depends(get_user_service),
+    current_user=Depends(get_current_user),
+):
+    service.ensure_user_can_access(current_user, user_id)
+    return service.get_user(user_id)
 
-@router.get("/")
-def root():
-    return {"message": "User service is running"}
+
+@router.get("/internal/users/{user_id}", response_model=UserResponse)
+def get_user_internal(
+    user_id: int = Path(..., gt=0),
+    service: UserService = Depends(get_user_service),
+):
+    return service.get_user(user_id)

@@ -1,18 +1,16 @@
-from typing import List
-
-from fastapi import Depends, APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Product
+from app.repositories.product_repository import ProductRepository
 from app.schemas import ProductCreate, ProductResponse
+from app.services.product_service import ProductService
 
 router = APIRouter()
 
 
-@router.get("/")
-def root():
-    return {"message": "Product service is running"}
+def get_product_service(db: Session = Depends(get_db)) -> ProductService:
+    return ProductService(ProductRepository(db))
 
 
 @router.get("/health")
@@ -20,23 +18,26 @@ def health():
     return {"status": "ok", "service": "product-service"}
 
 
-@router.get("/products", response_model=List[ProductResponse])
-def get_products(db: Session = Depends(get_db)):
-    return db.query(Product).order_by(Product.id).all()
+@router.get("/products", response_model=list[ProductResponse])
+def get_products(service: ProductService = Depends(get_product_service)):
+    return service.list_products()
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if product is None:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return product
+def get_product(
+    product_id: int = Path(..., gt=0),
+    service: ProductService = Depends(get_product_service),
+):
+    return service.get_product(product_id)
 
 
-@router.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-def create_product(product: ProductCreate, db: Session = Depends(get_db)):
-    db_product = Product(**product.model_dump())
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+@router.post(
+    "/products",
+    response_model=ProductResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_product(
+    product: ProductCreate,
+    service: ProductService = Depends(get_product_service),
+):
+    return service.create_product(product)
