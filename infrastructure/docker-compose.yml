@@ -19,6 +19,7 @@ services:
       - user-service
       - product-service
       - order-service
+      - payment-service
     restart: unless-stopped
     networks:
       - microservices-net
@@ -75,6 +76,26 @@ services:
       user-service:
         condition: service_started
       product-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - microservices-net
+  payment-service:
+    build: ../services/payment-service
+    container_name: payment-service
+    ports:
+      - "8006:8006"
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/payment_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
         condition: service_started
     restart: unless-stopped
     networks:
