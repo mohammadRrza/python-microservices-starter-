@@ -1,44 +1,16 @@
 import json
-import os
-import asyncio
+from aiokafka import AIOKafkaConsumer
+from app.db import SessionLocal, engine
+from app.models import Base, ProcessedEvent
 from aiokafka import AIOKafkaConsumer
 from app.core.config import settings
 
-async def consume_order_events():
-    bootstrap_servers = settings.kafka_bootstrap_servers
+KAFKA_BOOTSTRAP_SERVERS = settings.kafka_bootstrap_servers
+TOPIC_NAME = "order-events"
+GROUP_ID = "notification-group"
 
-    while True:
-        consumer = None
 
-        try:
-            consumer = AIOKafkaConsumer(
-                "orders.events",
-                bootstrap_servers=bootstrap_servers,
-                group_id="notification-service",
-                value_deserializer=lambda value: json.loads(value.decode("utf-8")),
-                auto_offset_reset="earliest",
-                enable_auto_commit=False,
-            )
-
-            await consumer.start()
-            print("Kafka consumer started")
-
-            async for message in consumer:
-                event = message.value
-
-                if event.get("event_type") == "OrderCreated":
-                    await handle_order_created(event)
-                await consumer.commit()
-        except Exception as exc:
-            print(f"Kafka consumer error, retrying in 5s... error={exc}")
-            await asyncio.sleep(5)
-
-        finally:
-            if consumer is not None:
-                try:
-                    await consumer.stop()
-                except Exception:
-                    pass
+Base.metadata.create_all(bind=engine)
 
 
 async def handle_order_created(event: dict):
@@ -50,3 +22,54 @@ async def handle_order_created(event: dict):
         f"user_id={data.get('user_id')}, "
         f"product_id={data.get('product_id')}"
     )
+
+
+async def consume_order_events():
+    consumer = AIOKafkaConsumer(
+        TOPIC_NAME,
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        group_id=GROUP_ID,
+        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+        enable_auto_commit=False,
+    )
+
+    await consumer.start()
+
+    try:
+        async for message in consumer:
+            event = message.value
+
+            event_id = str(event.get("event_id"))
+
+            db = SessionLocal()
+
+            try:
+                existing = (
+                    db.query(ProcessedEvent)
+                    .filter(ProcessedEvent.event_id == event_id)
+                    .first()
+                )
+
+                if existing:
+                    print(f"Skipping duplicate event: {event_id}")
+                    await consumer.commit()
+                    continue
+
+                if event.get("event_type") == "OrderCreated":
+                    await handle_order_created(event)
+
+                processed_event = ProcessedEvent(event_id=event_id)
+                db.add(processed_event)
+                db.commit()
+
+                await consumer.commit()
+
+            except Exception as e:
+                db.rollback()
+                print(f"Consumer error: {e}")
+
+            finally:
+                db.close()
+
+    finally:
+        await consumer.stop()

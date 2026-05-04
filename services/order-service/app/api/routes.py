@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
-
 from app.db import get_db
 from app.repositories.order_repository import OrderRepository
 from app.schemas import OrderCreate, OrderResponse
@@ -47,3 +46,4 @@ async def create_order(
     current_user=Depends(get_current_user),
 ):
     return await service.create_order(order)
+

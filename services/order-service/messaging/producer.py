@@ -2,6 +2,7 @@ import json
 import os
 import asyncio
 from aiokafka import AIOKafkaProducer
+from app.core.config import settings
 
 producer: AIOKafkaProducer | None = None
 
@@ -9,7 +10,7 @@ producer: AIOKafkaProducer | None = None
 async def start_kafka_producer():
     global producer
 
-    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    bootstrap_servers = settings.kafka_bootstrap_servers
 
     for attempt in range(10):
         try:

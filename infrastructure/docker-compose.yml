@@ -87,9 +87,12 @@ services:
       - "8004:8004"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db
     depends_on:
       kafka:
         condition: service_started
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - microservices-net
