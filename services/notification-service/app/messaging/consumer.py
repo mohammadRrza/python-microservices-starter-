@@ -2,15 +2,12 @@ import json
 from aiokafka import AIOKafkaConsumer
 from app.db import SessionLocal, engine
 from app.models import Base, ProcessedEvent
-from aiokafka import AIOKafkaConsumer
 from app.core.config import settings
 
 KAFKA_BOOTSTRAP_SERVERS = settings.kafka_bootstrap_servers
-TOPIC_NAME = "order-events"
+TOPIC_NAME = "orders.events"
 GROUP_ID = "notification-group"
 
-
-Base.metadata.create_all(bind=engine)
 
 
 async def handle_order_created(event: dict):
