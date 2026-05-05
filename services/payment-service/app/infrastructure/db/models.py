@@ -1,4 +1,14 @@
-from sqlalchemy import Column, String, Float, DateTime
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    Float,
+    DateTime,
+    JSON,
+    Boolean,
+)
 
 from app.infrastructure.db.session import Base
 
@@ -12,3 +22,26 @@ class PaymentModel(Base):
     currency = Column(String, nullable=False)
     status = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False)
+
+
+class OutboxEvent(Base):
+    __tablename__ = "payment_outbox_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    aggregate_type = Column(String, nullable=False)
+    aggregate_id = Column(String, nullable=False)
+
+    event_type = Column(String, nullable=False)
+
+    topic = Column(String, nullable=False)
+
+    payload = Column(JSON, nullable=False)
+
+    published = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
