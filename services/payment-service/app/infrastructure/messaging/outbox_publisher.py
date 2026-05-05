@@ -43,7 +43,7 @@ async def publish_outbox_events():
 
                 except Exception:
                     db.rollback()
-                    logger.exception("Payment Service: Failed to publish outbox event %s", event.id)
+                    logger.exception("Payment Service: SQLAlchemyOutboxRepositoryFailed to publish outbox event %s", event.id)
 
         finally:
             db.close()
